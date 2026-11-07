@@ -1,6 +1,6 @@
 # Domain Guard
 
-Domain Guard watches a list of domains and, when one breaks, has an AI agent work out why. It checks every site each hour and every registration each day. When something changes, it opens an incident, has the agent diagnose it with live checks, and either logs the result, emails you an escalation, or emails you Approve and Reject links for a proposed fix. A weekly email summarizes everything.
+Domain Guard watches a list of domains and, when one breaks, has an AI agent work out why. It checks every site each hour, and every registration, DNS setup and certificate each day, comparing them with what you expect. When something changes, it opens an incident, has the agent diagnose it with live checks, and either logs the result, emails you an escalation, or emails you Approve and Reject links for a proposed fix. A weekly email summarizes everything.
 
 It is built from [n8n](https://n8n.io) workflows (scheduling, checks, logging, email) and a [Raia](https://raia2.com) agent (diagnosis). A Google Sheet holds the domain list and all the logs.
 
@@ -8,8 +8,9 @@ It is built from [n8n](https://n8n.io) workflows (scheduling, checks, logging, e
 
 - **Scheduled monitor:** requests `https://<domain>` for every domain in the sheet. It alerts only when a site goes down (unreachable or HTTP 400+) or comes back up, so a site that stays down isn't reported every hour.
 - **Expiry sweep:** looks up each domain's registration (RDAP) and alerts when its problems change: not registered, expired, expiring within 30 days, on hold, and so on.
-- **Incident router:** keeps one incident per domain in the **Incident Log** tab, updating it on repeat alerts. It sends the alert and the incident history to the Raia agent and acts on the `STATUS:` line that ends the agent's reply.
-- **Check tools:** five small webhook workflows the agent calls for live evidence. They require a shared secret header.
+- **Config sweep:** once a day, for every domain, compares DNS records (A, AAAA, CNAME, NS, MX, TXT) with the previous day's snapshot and with the expected values in the **Domains** tab, and checks certificate expiry. It alerts on `NS_MISMATCH`, `HOST_MISMATCH`, `DNS_CHANGED` (with the list of changes), `CERT_EXPIRING` (14 days or less), `MULTIPLE_SPF`, and `CONFIG_RESTORED` when earlier findings clear. Address records that rotate a few at a time behind a CDN are ignored, and only a complete replacement counts.
+- **Incident router:** keeps one incident per domain in the **Incident Log** tab, updating it on repeat alerts. It sends the alert, the incident history and the domain's profile from the **Domains** tab to the Raia agent, and acts on the `STATUS:` line that ends the agent's reply.
+- **Check tools:** five small webhook workflows the agent calls for live evidence. They require a shared secret header. The DNS tool also reports SPF, DMARC and the DMARC policy, with warnings for duplicate records and mail domains missing SPF or DMARC.
 - **Approvals:** each link opens a confirmation page, so email scanners that pre-open links can't approve anything. Decisions are recorded in the **Approvals** tab. Domain Guard has no automated fixes, so an approved change is carried out by a person.
 - **Weekly report:** incidents opened, resolved and still open, median time to resolve, repeat offenders, pending approvals, and domains expiring within 60 days.
 - **Failure alerts:** set as the error workflow on every other workflow. It emails the failed workflow, step and error, at most once every 6 hours per error.
@@ -30,7 +31,7 @@ Make a spreadsheet with these tabs:
 
 | Tab | Contents |
 |---|---|
-| **Domains** | A `Domain` header in A1, then one domain per row, without `https://` |
+| **Domains** | One domain per row, without `https://`, under these headers: `Domain`, `Purpose`, `Criticality`, `Expected Nameservers`, `Expected Host`, `Notes`. Only `Domain` is required. Separate multiple nameservers with commas. |
 | **Incident Log** | Empty. The first incident writes its header row. |
 | **Approvals** | Empty |
 | **Active Incidents** | Empty (per-event history) |
@@ -54,7 +55,7 @@ Copy the spreadsheet ID from its URL (the long string between `/d/` and `/edit`)
    |---|---|---|
    | `YOUR_GOOGLE_SHEET_ID` | Your spreadsheet ID | Every Google Sheets node (or pick the sheet from the node's list) |
    | `you@example.com` | The address that should get alerts, approvals and reports | Email nodes in the incident router, weekly report and failure alerts |
-   | `your-instance.app.n8n.cloud` | Your n8n host | `Send to incident router` in the monitor and the sweep; `Send approval request` and `Build confirm page` in the incident router |
+   | `your-instance.app.n8n.cloud` | Your n8n host | `Send to incident router` in the monitor, the expiry sweep and the config sweep; `Send approval request` and `Build confirm page` in the incident router |
 
 5. **Set the error workflow.** Workflow IDs change on import, so open each workflow's **Settings** and set **Error workflow** to **Domain Guard - failure alerts**.
 6. **Publish** every workflow.
@@ -76,7 +77,7 @@ Copy the spreadsheet ID from its URL (the long string between `/d/` and `/edit`)
   curl -s -o /dev/null -w "%{http_code}\n" -X POST -H 'Content-Type: application/json' -d '{"domain":"example.com"}' https://your-instance.app.n8n.cloud/webhook/domain-guard-check-http
   ```
 
-The monitor and the sweep start with empty memory, so their first runs alert on every domain that has a problem at that moment.
+The monitor and the sweeps start with empty memory. Their first runs alert on every domain that has a problem at that moment, and the config sweep's first run records the DNS snapshot it compares against from then on.
 
 ## Webhooks
 
@@ -97,12 +98,14 @@ The two approval webhooks are opened from a browser, so they can't send a header
 ## Day-to-day use
 
 - **Add or remove a domain:** edit the **Domains** tab. The next run picks it up.
+- **Describe a domain:** fill in `Purpose` and `Criticality` so the agent can judge business impact, and keep `Expected Nameservers` and `Expected Host` current. After a planned DNS move, update them, or the config sweep reports a mismatch.
 - **Change the secret:** update the n8n **Header Auth account** credential, all five Raia Functions, and the Raia webhook skill. Anything left on the old value gets `403`.
 - **Incident IDs** look like `INC-20261103-ONXG`. They appear in the Incident Log, the Approvals tab and email subjects. An incident closes when the agent replies `STATUS: Resolved`, which records `Resolved At` and `Minutes Open`. The next alert for that domain opens a new incident.
 
 ## Limitations
 
 - There are no automated fixes. The agent diagnoses and proposes, and people make changes.
-- `03_company_context_and_tool_guide.md` is a template. It names some tools that aren't built here (`get_domain_status`, `get_change_history` and the remediation tools). The agent works with the five check tools that are built.
-- The monitor checks only the HTTPS home page of each domain.
+- `03_company_context_and_tool_guide.md` is a template. It names some tools that aren't built here (`get_domain_status`, `get_change_history` and the remediation tools). The agent instructions list the five tools that are built and tell the agent the others don't exist.
+- Change history is one day deep: the config sweep compares with the previous day's snapshot, so it can say what changed but not who changed it.
+- The monitor checks only the HTTPS home page of each domain. To watch a subdomain, add it as its own row in the **Domains** tab.
 - Schedules run in the n8n instance's timezone.
