@@ -6,27 +6,6 @@ It is built from [n8n](https://n8n.io) workflows (scheduling, checks, logging, e
 
 ## How it works
 
-```
- Every hour               Every day at 9:00
- scheduled monitor        expiry sweep
- (is each site up?)       (is each domain registered, expiring?)
-          \                    /
-           \  only on change  /
-            v                v
-          incident router  ─────────────►  Raia agent
-          (open or update an incident)     calls the 5 check tools:
-                 │                         HTTP, DNS, SSL, redirects, registration
-                 │  ◄───── diagnosis ending in a STATUS line ─────┘
-                 ▼
-   Resolved            → close the incident in the sheet
-   Investigating       → log it, keep it open
-   Escalated           → email you the diagnosis
-   Awaiting Approval   → email you Approve / Reject links
-   (no STATUS line)    → treated as Escalated
-
- Mondays 8:00: weekly report email      Any workflow fails: failure alert email
-```
-
 - **Scheduled monitor:** requests `https://<domain>` for every domain in the sheet. It alerts only when a site goes down (unreachable or HTTP 400+) or comes back up, so a site that stays down isn't reported every hour.
 - **Expiry sweep:** looks up each domain's registration (RDAP) and alerts when its problems change: not registered, expired, expiring within 30 days, on hold, and so on.
 - **Incident router:** keeps one incident per domain in the **Incident Log** tab, updating it on repeat alerts. It sends the alert and the incident history to the Raia agent and acts on the `STATUS:` line that ends the agent's reply.
@@ -34,28 +13,6 @@ It is built from [n8n](https://n8n.io) workflows (scheduling, checks, logging, e
 - **Approvals:** each link opens a confirmation page, so email scanners that pre-open links can't approve anything. Decisions are recorded in the **Approvals** tab. Domain Guard has no automated fixes, so an approved change is carried out by a person.
 - **Weekly report:** incidents opened, resolved and still open, median time to resolve, repeat offenders, pending approvals, and domains expiring within 60 days.
 - **Failure alerts:** set as the error workflow on every other workflow. It emails the failed workflow, step and error, at most once every 6 hours per error.
-
-## What's in this repo
-
-```
-workflows/               n8n workflow exports (import these)
-  scheduled_monitor.json   hourly site check
-  expiry_sweep.json        daily registration check
-  incident_router.json     incidents, Raia, email, approvals
-  check_http.json          check tool: HTTP status
-  check_dns.json           check tool: DNS records
-  check_ssl.json           check tool: SSL certificate
-  check_redirects.json     check tool: redirect chain
-  check_whois.json         check tool: domain registration (RDAP)
-  weekly_report.json       Monday summary email
-  failure_alerts.json      error workflow for all of the above
-raia/
-  agent_instructions.md    the agent's system instructions
-  functions.json           the five Raia Functions (tool definitions)
-  knowledge/               four documents uploaded to the agent's knowledge base
-docs/
-  test-results.md          notes from testing the agent's diagnoses
-```
 
 All personal details were replaced with placeholders, and no secrets are included. Credentials appear only by name, and you create your own.
 
