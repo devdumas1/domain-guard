@@ -1,0 +1,112 @@
+[
+  {
+    "name": "Check HTTP Status",
+    "internal_name": "check_http",
+    "instructions": "Use this function when Domain Guard needs to determine whether a website or endpoint is reachable, inspect its HTTP status, or verify recovery after remediation. Do not use it when the problem has already been conclusively identified as unrelated to HTTP availability.",
+    "webhook_url": "https://your-instance.app.n8n.cloud/webhook/domain-guard-check-http",
+    "http_method": "POST",
+    "headers": {
+      "X-Domain-Guard-Key": "YOUR_SECRET"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "domain"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain or hostname to check, for example portal.example.com"
+        }
+      }
+    }
+  },
+  {
+    "name": "Check DNS Records",
+    "internal_name": "check_dns",
+    "instructions": "Use this function when Domain Guard needs live DNS evidence for a domain: whether it resolves, and its A, AAAA, CNAME, NS and MX records plus the DNS status (NOERROR, NXDOMAIN, SERVFAIL). Use it when a site cannot be reached, when a missing or changed record is suspected, when nameservers may have changed, or when email delivery may be affected. If DNS has already been confirmed healthy and the problem is an HTTP error such as 503, do not keep re-checking DNS. Pass only the hostname, for example portal.example.com. Note: if the name is a CNAME, the NS and MX values may belong to the CNAME target rather than the name itself.",
+    "webhook_url": "https://your-instance.app.n8n.cloud/webhook/domain-guard-check-dns",
+    "http_method": "POST",
+    "headers": {
+      "X-Domain-Guard-Key": "YOUR_SECRET"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "domain"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain or hostname to look up, for example portal.example.com"
+        }
+      }
+    }
+  },
+  {
+    "name": "Check SSL Certificate",
+    "internal_name": "check_ssl",
+    "instructions": "Use this function when Domain Guard needs live evidence about a domain's SSL/TLS certificate: whether browsers would trust it, why not (problem: expired, not_yet_valid, hostname_mismatch, self_signed, untrusted_chain, dns_failure, connection_refused, timeout), days until expiry, issuer, validity dates and the names it covers. Use it for browser security warnings, suspected expired or misconfigured certificates, HTTPS failures that are not plain HTTP status errors, upcoming-expiry checks, and to verify a certificate after renewal. If HTTPS already returns a normal HTTP status (for example 503), the certificate is working and you do not need to re-check it. Pass only the hostname, for example portal.example.com. A dns_failure, connection_refused or timeout problem means the server could not be reached, not that the certificate itself is bad.",
+    "webhook_url": "https://your-instance.app.n8n.cloud/webhook/domain-guard-check-ssl",
+    "http_method": "POST",
+    "headers": {
+      "X-Domain-Guard-Key": "YOUR_SECRET"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "domain"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain or hostname whose certificate to check, for example portal.example.com"
+        }
+      }
+    }
+  },
+  {
+    "name": "Check Redirects",
+    "internal_name": "check_redirects",
+    "instructions": "Use this function to trace a domain's redirect chain hop by hop, starting from both https:// and http://. It returns ok, problems (redirect_loop, too_many_redirects, request_failed, final_error), warnings (https_downgrade, http_not_redirected_to_https, https_broken_but_http_works), and every hop with its status code and Location. Use it for redirect loops, 'too many redirects' browser errors, sites landing on the wrong page, HTTP-to-HTTPS problems, or when HTTP works but HTTPS does not. A request_failed hop includes the error, for example a TLS handshake failure on the redirect target. Warnings are worth fixing but are not outages. Pass the hostname, for example portal.example.com; you may include a path to trace a specific URL.",
+    "webhook_url": "https://your-instance.app.n8n.cloud/webhook/domain-guard-check-redirects",
+    "http_method": "POST",
+    "headers": {
+      "X-Domain-Guard-Key": "YOUR_SECRET"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "domain"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain or hostname to trace, for example portal.example.com (optionally with a path)"
+        }
+      }
+    }
+  },
+  {
+    "name": "Check Domain Registration",
+    "internal_name": "check_whois",
+    "instructions": "Use this function to look up a domain's registration at its registry (RDAP, the successor to WHOIS): whether it is registered, the registrar, expiry date, days_until_expiry, registry status codes and nameservers. It returns problems (not_registered, expired, expiring_within_30_days, on_hold, redemption_period, pending_delete) and warnings (expiring_within_60_days, no_transfer_lock). Use it when DNS returns NXDOMAIN or no nameservers, for suspected expiry, suspension or ownership issues, after unexpected nameserver changes, and to confirm a renewal. A not_registered or expired domain explains a total outage; registrar and ownership actions are always high risk and must be escalated. Pass the domain name, for example example.com; subdomains are reduced to the registered domain.",
+    "webhook_url": "https://your-instance.app.n8n.cloud/webhook/domain-guard-check-whois",
+    "http_method": "POST",
+    "headers": {
+      "X-Domain-Guard-Key": "YOUR_SECRET"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "domain"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain to look up, for example example.com"
+        }
+      }
+    }
+  }
+]

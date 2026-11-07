@@ -1,84 +1,151 @@
 # Domain Guard
 
-Domain Guard monitors a portfolio of domains and investigates problems with an AI agent. It is built from n8n workflows and a [Raia](https://raia2.com) agent:
+Domain Guard watches a list of domains and, when one breaks, has an AI agent work out why. It checks every site each hour and every registration each day. When something changes, it opens an incident, has the agent diagnose it with live checks, and either logs the result, emails you an escalation, or emails you Approve and Reject links for a proposed fix. A weekly email summarizes everything.
 
-- An hourly monitor and a daily expiry sweep check every domain listed in a Google Sheet.
-- Problems go to an incident router, which opens or updates an incident, asks the Raia agent to diagnose it, and logs the result.
-- The agent calls five check tools (HTTP status, DNS, SSL certificate, redirects, domain registration), which are n8n webhooks.
-- Fixes that need a human go out by email as Approve and Reject links.
-- A weekly report summarizes incidents, approvals and upcoming domain expiries, and a failure-alert workflow emails you if any of these workflows breaks.
+It is built from [n8n](https://n8n.io) workflows (scheduling, checks, logging, email) and a [Raia](https://raia2.com) agent (diagnosis). A Google Sheet holds the domain list and all the logs.
 
-The workflow files are in [`workflows/`](workflows). Test notes from the agent's evaluation are in [`docs/test-results.md`](docs/test-results.md).
+## How it works
 
-## Placeholders to replace
+```
+ Every hour               Every day at 9:00
+ scheduled monitor        expiry sweep
+ (is each site up?)       (is each domain registered, expiring?)
+          \                    /
+           \  only on change  /
+            v                v
+          incident router  ─────────────►  Raia agent
+          (open or update an incident)     calls the 5 check tools:
+                 │                         HTTP, DNS, SSL, redirects, registration
+                 │  ◄───── diagnosis ending in a STATUS line ─────┘
+                 ▼
+   Resolved            → close the incident in the sheet
+   Investigating       → log it, keep it open
+   Escalated           → email you the diagnosis
+   Awaiting Approval   → email you Approve / Reject links
+   (no STATUS line)    → treated as Escalated
 
-The exports were scrubbed before publishing. After importing, replace these in the workflows:
+ Mondays 8:00: weekly report email      Any workflow fails: failure alert email
+```
 
-| Placeholder | Replace with | Where |
+- **Scheduled monitor:** requests `https://<domain>` for every domain in the sheet. It alerts only when a site goes down (unreachable or HTTP 400+) or comes back up, so a site that stays down isn't reported every hour.
+- **Expiry sweep:** looks up each domain's registration (RDAP) and alerts when its problems change: not registered, expired, expiring within 30 days, on hold, and so on.
+- **Incident router:** keeps one incident per domain in the **Incident Log** tab, updating it on repeat alerts. It sends the alert and the incident history to the Raia agent and acts on the `STATUS:` line that ends the agent's reply.
+- **Check tools:** five small webhook workflows the agent calls for live evidence. They require a shared secret header.
+- **Approvals:** each link opens a confirmation page, so email scanners that pre-open links can't approve anything. Decisions are recorded in the **Approvals** tab. Domain Guard has no automated fixes, so an approved change is carried out by a person.
+- **Weekly report:** incidents opened, resolved and still open, median time to resolve, repeat offenders, pending approvals, and domains expiring within 60 days.
+- **Failure alerts:** set as the error workflow on every other workflow. It emails the failed workflow, step and error, at most once every 6 hours per error.
+
+## What's in this repo
+
+```
+workflows/               n8n workflow exports (import these)
+  scheduled_monitor.json   hourly site check
+  expiry_sweep.json        daily registration check
+  incident_router.json     incidents, Raia, email, approvals
+  check_http.json          check tool: HTTP status
+  check_dns.json           check tool: DNS records
+  check_ssl.json           check tool: SSL certificate
+  check_redirects.json     check tool: redirect chain
+  check_whois.json         check tool: domain registration (RDAP)
+  weekly_report.json       Monday summary email
+  failure_alerts.json      error workflow for all of the above
+raia/
+  agent_instructions.md    the agent's system instructions
+  functions.json           the five Raia Functions (tool definitions)
+  knowledge/               four documents uploaded to the agent's knowledge base
+docs/
+  test-results.md          notes from testing the agent's diagnoses
+```
+
+All personal details were replaced with placeholders, and no secrets are included. Credentials appear only by name, and you create your own.
+
+## Requirements
+
+- An n8n instance (n8n Cloud or self-hosted) that can install community nodes
+- A Raia account and agent
+- A Google account for Sheets and Gmail
+
+## Setup
+
+### 1. Create the Google Sheet
+
+Make a spreadsheet with these tabs:
+
+| Tab | Contents |
+|---|---|
+| **Domains** | A `Domain` header in A1, then one domain per row, without `https://` |
+| **Incident Log** | Empty. The first incident writes its header row. |
+| **Approvals** | Empty |
+| **Active Incidents** | Empty (per-event history) |
+| **Incidents** | Empty (per-event history) |
+| **Conversations** | Empty (one row per finished agent conversation) |
+
+Copy the spreadsheet ID from its URL (the long string between `/d/` and `/edit`).
+
+### 2. Set up n8n
+
+1. **Install the Raia node:** community package `n8n-nodes-raia`.
+2. **Create four credentials:**
+   - **Google Sheets account** (Google sign-in)
+   - **Gmail account** (Google sign-in)
+   - **Raia account** (your Raia API key)
+   - **Header Auth account:** name `X-Domain-Guard-Key`, value = a long random secret you make up. Keep a copy, because Raia needs it too.
+3. **Import the workflows.** For each file in `workflows/`, create a workflow, open the **⋯** menu, choose **Import from file**, and select the credential on any node that asks for one.
+4. **Replace the placeholders:**
+
+   | Placeholder | Replace with | Where |
+   |---|---|---|
+   | `YOUR_GOOGLE_SHEET_ID` | Your spreadsheet ID | Every Google Sheets node (or pick the sheet from the node's list) |
+   | `you@example.com` | The address that should get alerts, approvals and reports | Email nodes in the incident router, weekly report and failure alerts |
+   | `your-instance.app.n8n.cloud` | Your n8n host | `Send to incident router` in the monitor and the sweep; `Send approval request` and `Build confirm page` in the incident router |
+
+5. **Set the error workflow.** Workflow IDs change on import, so open each workflow's **Settings** and set **Error workflow** to **Domain Guard - failure alerts**.
+6. **Publish** every workflow.
+
+### 3. Set up the Raia agent
+
+1. **Instructions:** paste [`raia/agent_instructions.md`](raia/agent_instructions.md) into the agent's instructions (Train tab).
+2. **Knowledge:** upload the four files in [`raia/knowledge/`](raia/knowledge). Fill in the placeholders in `03_company_context_and_tool_guide.md` (registrars, providers, critical domains, contacts) with your own details. The agent uses them to judge severity.
+3. **Functions:** create one Function for each entry in [`raia/functions.json`](raia/functions.json): name, internal name, instructions, webhook URL, method `POST` and parameters. Replace `your-instance.app.n8n.cloud` with your host, and add the header `X-Domain-Guard-Key` with your secret as the value.
+4. **Webhook skill:** add a webhook that triggers **when a dialog ends**, calling `https://<your n8n host>/webhook/domain-guard-thread-end` with the same `X-Domain-Guard-Key` header. This logs each conversation to the **Conversations** tab.
+
+### 4. Check it works
+
+- Ask the agent "Is example.com up right now?". It should call the HTTP tool and end with `STATUS: Resolved`.
+- Ask it something off-topic. It should reply with a single line saying it only handles domain issues, with no `STATUS:` line.
+- A request to a check tool without the header should get `403`:
+
+  ```bash
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST -H 'Content-Type: application/json' -d '{"domain":"example.com"}' https://your-instance.app.n8n.cloud/webhook/domain-guard-check-http
+  ```
+
+The monitor and the sweep start with empty memory, so their first runs alert on every domain that has a problem at that moment.
+
+## Webhooks
+
+| Workflow | Path | Protected by |
 |---|---|---|
-| `you@example.com` | The address that receives alerts, approvals and reports | Email nodes in the incident router, weekly report and failure alerts |
-| `YOUR_GOOGLE_SHEET_ID` | The ID of your Domain Guard spreadsheet | Every Google Sheets node (or pick the sheet from the node's list) |
-| `your-instance.app.n8n.cloud` | Your n8n address | `Send to incident router` in the monitor and sweep, and the approval links in the incident router |
+| incident router | `POST /webhook/domain-guard-incident` | `X-Domain-Guard-Key` |
+| incident router | `POST /webhook/domain-guard-thread-end` | `X-Domain-Guard-Key` |
+| incident router | `GET /webhook/domain-guard-approval` | Per-request token in the link |
+| incident router | `POST /webhook/domain-guard-approval-confirm` | Per-request token in the form |
+| check_http | `POST /webhook/domain-guard-check-http` | `X-Domain-Guard-Key` |
+| check_dns | `POST /webhook/domain-guard-check-dns` | `X-Domain-Guard-Key` |
+| check_ssl | `POST /webhook/domain-guard-check-ssl` | `X-Domain-Guard-Key` |
+| check_redirects | `POST /webhook/domain-guard-check-redirects` | `X-Domain-Guard-Key` |
+| check_whois | `POST /webhook/domain-guard-check-whois` | `X-Domain-Guard-Key` |
 
-No secrets are included. Credentials appear only by name, and you create your own (see *Restoring into another n8n account* below).
+The two approval webhooks are opened from a browser, so they can't send a header. Instead, each approval has its own random token. A confirmation is recorded only if the token matches and the approval is still `Pending`.
 
+## Day-to-day use
 
-Exported from n8n Cloud on 3 Nov 2026, and the five `check_*` files again on 7 Nov 2026. Each file was verified against the live, published workflow with a SHA-256 hash of its nodes, connections and settings.
+- **Add or remove a domain:** edit the **Domains** tab. The next run picks it up.
+- **Change the secret:** update the n8n **Header Auth account** credential, all five Raia Functions, and the Raia webhook skill. Anything left on the old value gets `403`.
+- **Incident IDs** look like `INC-20261103-ONXG`. They appear in the Incident Log, the Approvals tab and email subjects. An incident closes when the agent replies `STATUS: Resolved`, which records `Resolved At` and `Minutes Open`. The next alert for that domain opens a new incident.
 
-## Check tool security
+## Limitations
 
-The five check webhooks (`check_http`, `check_dns`, `check_ssl`, `check_redirects`, `check_whois`) require the `X-Domain-Guard-Key` header and answer `403` without it. Each of the five Raia Functions sends that header, with the same value as the n8n **Header Auth account** credential. If you change the secret, update it in that credential and in all five Raia Functions, or Raia's checks will fail.
-
-| File | Workflow | Webhook path |
-|---|---|---|
-| `incident_router.json` | Domain Guard - incident router | `/webhook/domain-guard-incident`, `/webhook/domain-guard-thread-end`, `/webhook/domain-guard-approval` (GET), `/webhook/domain-guard-approval-confirm` (POST) |
-| `check_http.json` | Domain Guard - check_http | `/webhook/domain-guard-check-http` |
-| `check_dns.json` | Domain Guard - check_dns | `/webhook/domain-guard-check-dns` |
-| `check_ssl.json` | Domain Guard - check_ssl | `/webhook/domain-guard-check-ssl` |
-| `check_redirects.json` | Domain Guard - check_redirects | `/webhook/domain-guard-check-redirects` |
-| `check_whois.json` | Domain Guard - check_whois | `/webhook/domain-guard-check-whois` |
-| `scheduled_monitor.json` | Domain Guard - scheduled monitor | none (runs every hour, on the hour) |
-| `expiry_sweep.json` | Domain Guard - expiry sweep | none (runs daily at 9:00) |
-| `weekly_report.json` | Domain Guard - weekly report | none (runs Mondays at 8:00) |
-| `failure_alerts.json` | Domain Guard - failure alerts | none (runs when another Domain Guard workflow fails) |
-
-## Watched domains
-
-The scheduled monitor, the expiry sweep and the weekly report all read the domain list from the **Domains** tab of the Domain Guard sheet: one domain per row under a `Domain` header, without `https://`. To add or remove a domain, edit that tab. The next run of each workflow picks it up.
-
-## Incident lifecycle
-
-Every alert that reaches the incident router is attached to an incident in the **Incident Log** tab, one row per incident. If the domain already has an incident that isn't `Resolved`, the alert updates that row. Otherwise the router opens a new one with an ID like `INC-20261103-ONXG`. Raia is told whether the alert is new or an update, and what happened so far. The row records the status, when it opened, the number of updates, every event type seen, and Raia's latest diagnosis. When Raia replies `STATUS: Resolved` (for example after the monitor reports `RECOVERED` and Raia verifies the site), the row is closed with `Resolved At` and `Minutes Open`. The next alert for that domain opens a new incident. Approval rows and email subjects carry the incident ID. The older **Active Incidents** and **Incidents** tabs still get one row per event as a history.
-
-The router needs the **Incident Log** tab to exist. In a new spreadsheet, add an empty tab with that name. The first incident writes its header row.
-
-## Weekly report
-
-Every Monday at 8:00 (the n8n account's timezone) the weekly report emails a summary of the last 7 days: incidents opened, resolved and still open, the median time to resolve, domains with repeat incidents, approvals waiting on you, and every domain whose registration expires within 60 days. It reads the **Incident Log** and **Approvals** tabs and looks up each domain's registration (about a minute of lookups).
-
-## Failure alerts
-
-Every Domain Guard workflow has **Domain Guard - failure alerts** set as its error workflow (Workflow settings → Error workflow). When a run fails, for example because a Google sign-in expired or Raia is down, it emails the workflow name, the failed step, the error and a link to the failed run. The same error from the same workflow is emailed at most once every 6 hours.
-
-## Approvals
-
-When Raia ends with `STATUS: Awaiting Approval`, the incident router adds a row to the **Approvals** tab of the Domain Guard sheet and emails Approve and Reject links. Each link opens a confirmation page, and nothing is recorded until you confirm there, so email scanners that pre-open links can't approve anything. Confirming checks the row's token and that the row is still `Pending`, then sets `Status` to `Approved` or `Rejected` with the time and an optional note. A second confirmation, a wrong token or an unknown ID gets a "Not recorded" page. The two approval webhooks have no header auth because they are opened from a browser. The token in the link is what protects them. After you reject a request, the confirmation page says that no change will be made.
-
-## Restoring into another n8n account
-
-1. In n8n, create a new workflow, open the **⋯** menu, choose **Import from file**, and pick one JSON file. Repeat for each file.
-2. **Reconnect the logins.** Exports contain only credential names, never secrets. Recreate these and select them on the nodes that use them:
-   - **Raia account** (Raia API key): the `raia` node
-   - **Gmail account** (Google sign-in): the email nodes in the incident router, the weekly report and the failure alerts
-   - **Google Sheets account** (Google sign-in): every Google Sheets node (logging, approvals, incidents and the `Read domains` nodes)
-   - **Header Auth account**: name `X-Domain-Guard-Key`, value = your secret. Used by the `Monitor alert` and `Raia thread end` webhooks, by `Send to incident router` in the scheduled monitor, and by the webhook of each of the five check workflows.
-3. **Install the Raia node** if n8n asks (community package `n8n-nodes-raia`).
-4. **Sheet tabs.** The Domain Guard spreadsheet needs these tabs: **Domains** (a `Domain` column with one domain per row), **Incident Log**, **Approvals**, **Active Incidents**, **Incidents** and **Conversations**.
-5. **Failure alerts.** Workflow IDs change on import, so open each workflow's settings and pick **Domain Guard - failure alerts** as the error workflow.
-6. **Publish** each workflow.
-7. **Point everything at your n8n address** (replace `your-instance.app.n8n.cloud`):
-   - The five Raia Functions (Check HTTP Status, Check DNS Records, Check SSL Certificate, Check Redirects, Check Domain Registration). Keep their `X-Domain-Guard-Key` header.
-   - Raia's n8n webhook (onThreadEnd)
-   - The `Send to incident router` URL in the scheduled monitor and in the expiry sweep
-   - The approval link URLs in `Send approval request` and the form address in `Build confirm page`
-8. **The monitor's and the sweep's memory starts empty** in a new account, so their first runs alert on any domain that has a problem at that moment.
+- There are no automated fixes. The agent diagnoses and proposes, and people make changes.
+- `03_company_context_and_tool_guide.md` is a template. It names some tools that aren't built here (`get_domain_status`, `get_change_history` and the remediation tools). The agent works with the five check tools that are built.
+- The monitor checks only the HTTPS home page of each domain.
+- Schedules run in the n8n instance's timezone.
