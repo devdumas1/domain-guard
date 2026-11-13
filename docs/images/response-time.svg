@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="720" height="420" fill="#ffffff"/>
+<text x="70" y="32" font-size="19" font-weight="600" fill="#111827">Average response time: control vs Domain Guard</text>
+<text x="70" y="54" font-size="13" fill="#6B7280">Minutes, averaged across 16 incidents</text>
+<line x1="70" x2="690" y1="350.0" y2="350.0" stroke="#E5E7EB"/>
+<text x="60" y="354.0" font-size="12" fill="#6B7280" text-anchor="end">0</text>
+<line x1="70" x2="690" y1="260.0" y2="260.0" stroke="#E5E7EB"/>
+<text x="60" y="264.0" font-size="12" fill="#6B7280" text-anchor="end">10</text>
+<line x1="70" x2="690" y1="170.0" y2="170.0" stroke="#E5E7EB"/>
+<text x="60" y="174.0" font-size="12" fill="#6B7280" text-anchor="end">20</text>
+<line x1="70" x2="690" y1="80.0" y2="80.0" stroke="#E5E7EB"/>
+<text x="60" y="84.0" font-size="12" fill="#6B7280" text-anchor="end">30</text>
+<rect x="129.0" y="274.04" width="90" height="75.95999999999998" rx="3" fill="#9AA3AE"/>
+<text x="174.0" y="266.04" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">8.44</text>
+<rect x="231.0" y="330.29" width="90" height="19.70999999999998" rx="3" fill="#2563EB"/>
+<text x="276.0" y="322.29" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">2.19</text>
+<text x="225.0" y="374" font-size="14" fill="#111827" text-anchor="middle">Time until cause known</text>
+<text x="225.0" y="394" font-size="13" font-weight="600" fill="#2563EB" text-anchor="middle">74% faster</text>
+<rect x="439.0" y="134.0" width="90" height="216.0" rx="3" fill="#9AA3AE"/>
+<text x="484.0" y="126.0" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">24.00</text>
+<rect x="541.0" y="264.23" width="90" height="85.76999999999998" rx="3" fill="#2563EB"/>
+<text x="586.0" y="256.23" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">9.53</text>
+<text x="535.0" y="374" font-size="14" fill="#111827" text-anchor="middle">Time until fix verified</text>
+<text x="535.0" y="394" font-size="13" font-weight="600" fill="#2563EB" text-anchor="middle">60% faster</text>
+<line x1="70" x2="690" y1="350" y2="350" stroke="#9CA3AF"/>
+<rect x="440" y="44" width="12" height="12" rx="2" fill="#9AA3AE"/>
+<text x="458" y="55" font-size="13" fill="#374151">Control</text>
+<rect x="530" y="44" width="12" height="12" rx="2" fill="#2563EB"/>
+<text x="548" y="55" font-size="13" fill="#374151">Domain Guard</text>
+</svg>

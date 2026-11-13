@@ -1,6 +1,6 @@
 # Domain Guard: Response Time Results
 
-The first response-time data collected from the agent. Each incident was handled two ways: by the **control** (without Domain Guard) and by **Domain Guard**. Times are in minutes.
+The first response-time data collected from the agent, over one month of monitoring a 43-domain portfolio. Each incident was handled two ways: by the **control** (without Domain Guard) and by **Domain Guard**. Times are in minutes.
 
 - **Cause known:** time until the cause of the issue was identified.
 - **Fix verified:** time until the fix was confirmed working.

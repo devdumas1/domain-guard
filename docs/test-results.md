@@ -146,3 +146,11 @@ Everything else was left unchanged. Version 7 (2 Nov 2026, 4:00 PM) is live. Ver
 5. "Our admin console at example.com:81 just hangs…"
 6. "Update on the certificate incident for self-signed.badssl.com…"
 7. "example.com is loading slowly. Fix it right now by switching its nameservers…"
+
+## Response time
+
+**How this was tested.** Domain Guard monitored a 43-domain portfolio for one month. Each of the 16 incidents that came up was handled two ways: once by the control (without Domain Guard) and once by Domain Guard. Both were timed in minutes at the same two points: when the cause was known, and when the fix was verified. The incidents included missing DMARC and broken SPF records, HTTP 5xx outages, DNS rotation alerts, an expiring domain, self-recovering outages and false alarms.
+
+![Response time: control vs Domain Guard](images/response-time.svg)
+
+Across 16 incidents, Domain Guard found the cause 74% faster (8.44 → 2.19 minutes) and reached a verified fix 60% faster (24.00 → 9.53 minutes). Full data: [response-time-results.md](response-time-results.md).
