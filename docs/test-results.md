@@ -19,3 +19,11 @@ Domain Guard resolved 5 of the 16 incidents (31.25%) itself, through a one-click
 - netwebservers.com: missing DMARC record
 - tupanama.com: wrong A record target (expected host known)
 - harmonytrust.com: missing DMARC record
+
+Domain Guard's daily registration check also detected three domains expiring within 60 days and flagged them before they lapsed:
+
+| Domain | Days left (as of 1 November 2026) |
+|---|---:|
+| doffads.com | 37 |
+| netplaymedia.net | 46 |
+| fordpanama.com | 49 |
