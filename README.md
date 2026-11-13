@@ -37,7 +37,3 @@ Domain Guard is an AI-powered domain monitoring system that I built with the Rai
 **n8n workflow**
 
 ![n8n workflow](docs/images/incident-router.png)
-
----
-
-Setup instructions and technical reference: [docs/setup.md](docs/setup.md)
