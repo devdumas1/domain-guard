@@ -17,7 +17,7 @@ The first response-time data collected from the agent, over one month of monitor
 | domaintechinv.com | Repeated DNS rotation alert | 6 | 1 | 10 | 3 |
 | netwebservers.com | Missing DMARC | 7 | 2 | 25 | 9 |
 | panamasummit.com | Second HTTP 5xx outage | 14 | 4 | 45 | 18 |
-| tupanama.com | One-time DNS edit validation | 15 | 4 | 40 | 14 |
+| tupanama.com | Wrong A record target (expected host known) | 15 | 4 | 40 | 14 |
 | datingoffers.co.uk | Repeated false alarm | 7 | 2 | 12 | 4 |
 | invoiceagency.com | Second self-recovering outage | 3 | 1 | 7 | 5.6 |
 | harmonytrust.com | Missing DMARC | 5 | 1 | 18 | 7 |
