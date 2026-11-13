@@ -9,3 +9,13 @@ Domain Guard monitored a 43-domain portfolio for one month. For each of the 16 i
 ![Response time: control vs Domain Guard](images/response-time.svg)
 
 Across 16 incidents, Domain Guard found the cause 74% faster (8.44 → 2.19 minutes) and reached a verified fix 60% faster (24.00 → 9.53 minutes). Full data: [response-time-results.md](response-time-results.md).
+
+## Resolved by Domain Guard
+
+Domain Guard resolved 5 of the 16 incidents (31.25%) itself, through a one-click approved DNS fix with no manual troubleshooting:
+
+- prdpanama.com: missing DMARC record
+- cbranch.com: broken SPF record
+- netwebservers.com: missing DMARC record
+- tupanama.com: wrong A record target (expected host known)
+- harmonytrust.com: missing DMARC record
